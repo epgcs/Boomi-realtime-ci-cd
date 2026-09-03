@@ -1,0 +1,84 @@
+name: Boomi CI/CD - Robust Automation
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+
+  boomi-deployment:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # --------------------------------------------------
+      # 1. Checkout Repository
+      # --------------------------------------------------
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # --------------------------------------------------
+      # 2. Setup Python
+      # --------------------------------------------------
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # --------------------------------------------------
+      # 3. Validate Boomi Connection
+      # --------------------------------------------------
+
+      - name: Validate Boomi Connection
+        run: python scripts/validate.py
+        env:
+          BOOMI_ACCOUNT_ID: ${{ secrets.BOOMI_ACCOUNT_ID }}
+          BOOMI_API_USERNAME: ${{ secrets.BOOMI_API_USERNAME }}
+          BOOMI_API_TOKEN: ${{ secrets.BOOMI_API_TOKEN }}
+
+      # --------------------------------------------------
+      # 4. Create Package
+      # --------------------------------------------------
+
+      - name: Package Component
+        id: package
+        run: python scripts/package.py
+        env:
+          BOOMI_ACCOUNT_ID: ${{ secrets.BOOMI_ACCOUNT_ID }}
+          BOOMI_API_USERNAME: ${{ secrets.BOOMI_API_USERNAME }}
+          BOOMI_API_TOKEN: ${{ secrets.BOOMI_API_TOKEN }}
+
+      # --------------------------------------------------
+      # 5. Deploy Package to BETA
+      # --------------------------------------------------
+
+      - name: Deploy Package to BETA
+        run: python scripts/deploy.py
+        env:
+          BOOMI_ACCOUNT_ID: ${{ secrets.BOOMI_ACCOUNT_ID }}
+          BOOMI_API_USERNAME: ${{ secrets.BOOMI_API_USERNAME }}
+          BOOMI_API_TOKEN: ${{ secrets.BOOMI_API_TOKEN }}
+          BOOMI_PACKAGE_ID: ${{ steps.package.outputs.package_id }}
+          BOOMI_PACKAGE_VERSION: ${{ steps.package.outputs.package_version }}
+
+      # --------------------------------------------------
+      # 6. Deployment Summary
+      # --------------------------------------------------
+
+      - name: Deployment Summary
+        if: success()
+        run: |
+          echo "======================================"
+          echo "Boomi CI/CD Deployment Successful"
+          echo "======================================"
+          echo "Process: ${{ steps.package.outputs.package_version }}"
+          echo "Package ID: ${{ steps.package.outputs.package_id }}"
+          echo "Package Version: ${{ steps.package.outputs.package_version }}"
+          echo "Environment: BETA"
+          echo "======================================"
